@@ -68,20 +68,84 @@ void GameLoop::init() {
 		{1, {"game/assets/critters/wolf/wolf-run.png", 8, 0.08f, frameRect}},
 	};
 
+	// Player wolf
 	auto wolf =
 		systems::createNPC(m_registry, {5.f, 5.f}, targetWolfSize, wolfClips, 5.f);
 	m_registry.emplace<engine::PlayerControlled>(wolf);
 	m_registry.emplace<engine::CastsShadow>(wolf);
+	
+	// Add health to player
+	engine::Health playerHealth;
+	playerHealth.current = 100.f;
+	playerHealth.maximum = 100.f;
+	m_registry.emplace<engine::Health>(wolf, playerHealth);
+	
+	// Add weapon to player
+	engine::Weapon weapon;
+	weapon.fireRate = 0.3f;
+	weapon.bulletSpeed = 20.f;
+	m_registry.emplace<engine::Weapon>(wolf, weapon);
+	
+	// Add weapon display to player
+	engine::WeaponDisplay weaponDisplay;
+	weaponDisplay.textureName = "game/assets/weapons/pistol-idle.png";
+	weaponDisplay.offset = {0.3f, -0.1f};
+	weaponDisplay.size = {24.f, 24.f};
+	m_registry.emplace<engine::WeaponDisplay>(wolf, weaponDisplay);
 
+	// Enemy wolf 1 (chaser)
 	auto wolf1 =
 		systems::createNPC(m_registry, {8.f, 8.f}, targetWolfSize, wolfClips, 2.5f);
 	m_registry.emplace<engine::ChasingPlayer>(wolf1);
 	m_registry.emplace<engine::CastsShadow>(wolf1);
+	
+	engine::Health enemy1Health;
+	enemy1Health.current = 100.f;
+	enemy1Health.maximum = 100.f;
+	m_registry.emplace<engine::Health>(wolf1, enemy1Health);
+	
+	engine::Weapon enemy1Weapon;
+	enemy1Weapon.fireRate = 0.4f;
+	enemy1Weapon.bulletSpeed = 18.f;
+	m_registry.emplace<engine::Weapon>(wolf1, enemy1Weapon);
+	
+	engine::WeaponDisplay enemy1WeaponDisplay;
+	enemy1WeaponDisplay.textureName = "game/assets/weapons/pistol-idle.png";
+	enemy1WeaponDisplay.size = {24.f, 24.f};
+	m_registry.emplace<engine::WeaponDisplay>(wolf1, enemy1WeaponDisplay);
+	
+	engine::AICombat enemy1AI;
+	enemy1AI.shootInterval = 1.2f;
+	enemy1AI.detectionRange = 12.f;
+	enemy1AI.shootingRange = 9.f;
+	m_registry.emplace<engine::AICombat>(wolf1, enemy1AI);
 
+	// Wandering wolves (enemies)
 	for (int i = 0; i < 2; i++) {
 		auto npc = systems::createNPC(m_registry, {i + 10.f, 0.f}, targetWolfSize,
 									  wolfClips, 1.f);
 		m_registry.emplace<engine::CastsShadow>(npc);
+		
+		engine::Health npcHealth;
+		npcHealth.current = 100.f;
+		npcHealth.maximum = 100.f;
+		m_registry.emplace<engine::Health>(npc, npcHealth);
+		
+		engine::Weapon npcWeapon;
+		npcWeapon.fireRate = 0.5f;
+		npcWeapon.bulletSpeed = 16.f;
+		m_registry.emplace<engine::Weapon>(npc, npcWeapon);
+		
+		engine::WeaponDisplay npcWeaponDisplay;
+		npcWeaponDisplay.textureName = "game/assets/weapons/pistol-idle.png";
+		npcWeaponDisplay.size = {24.f, 24.f};
+		m_registry.emplace<engine::WeaponDisplay>(npc, npcWeaponDisplay);
+		
+		engine::AICombat npcAI;
+		npcAI.shootInterval = 1.5f + i * 0.3f;
+		npcAI.detectionRange = 10.f;
+		npcAI.shootingRange = 8.f;
+		m_registry.emplace<engine::AICombat>(npc, npcAI);
 	}
 }
 
@@ -109,14 +173,26 @@ void GameLoop::gameAnimationSystem(float dt) {
 }
 
 void GameLoop::update(engine::Input &input, float dt) {
+	// Input and AI
 	systems::playerInputSystem(m_registry, input);
+	systems::aiCombatSystem(m_registry, input, dt);
+	
+	// Combat
+	systems::weaponSystem(m_registry, input, dt);
+	systems::projectileSystem(m_registry, tiles, width, height, dt);
+	systems::damageSystem(m_registry);
+	systems::deathSystem(m_registry);
+	
+	// Movement
 	systems::npcFollowPlayerSystem(m_registry, dt);
 	systems::npcWanderSystem(m_registry, dt);
 	systems::movementSystem(m_registry, tiles, width, height, dt);
+	
+	// Animation
 	systems::animationSystem(m_registry, dt);
 	gameAnimationSystem(dt);
 
-	// camera follow
+	// Camera follow
 	auto playerView =
 		m_registry.view<const engine::Position, const engine::PlayerControlled>();
 	for (auto entity : playerView) {
@@ -127,11 +203,21 @@ void GameLoop::update(engine::Input &input, float dt) {
 
 void GameLoop::collectRenderData(engine::RenderFrame &frame,
 								 engine::Camera &camera) {
+	// Initialize vertex arrays
+	frame.healthBarVertices.setPrimitiveType(sf::PrimitiveType::Points);
+	frame.healthBarVertices.clear();
+	
 	// Collecting static map texture
 	frame.tileVertices = m_staticMapPoints;
 
 	// Collecting entities
 	systems::renderSystem(m_registry, frame, camera, m_engine->imageManager);
+	
+	// Render weapons on top of entities
+	systems::weaponDisplaySystem(m_registry, frame, camera, m_engine->imageManager);
+	
+	// Render health bars on top of everything
+	systems::healthBarSystem(m_registry, frame, camera);
 }
 
 bool GameLoop::isFinished() const { return m_finished; }

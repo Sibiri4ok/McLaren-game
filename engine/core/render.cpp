@@ -155,5 +155,8 @@ void Render::drawFrame(const RenderFrame &frame) {
 	for (auto &spr : frame.sprites) {
 		drawSprite(window, spr, 1);
 	}
+	
+	// Draw health bars on top
+	window.draw(frame.healthBarVertices);
 }
 } // namespace engine

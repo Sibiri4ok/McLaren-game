@@ -38,6 +38,7 @@ struct RenderFrame {
 
 	std::vector<SpriteData> sprites; ///< Collection of sprites to render this frame
 	sf::VertexArray tileVertices;	 ///< Vertex data for tile-based rendering
+	sf::VertexArray healthBarVertices; ///< Vertex data for health bar rendering
 };
 
 } // namespace engine
