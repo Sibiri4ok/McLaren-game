@@ -70,11 +70,23 @@ void GameLoop::init() {
 		{1, {"game/assets/critters/wolf/wolf-run.png", 8, 0.08f, frameRect}},
 	};
 
+	// Initialize weapon types
+	// Weapon 1: Standard (fireRate 0.3f, damage 10)
+	// Weapon 2: Fast (fireRate 0.15f = 2x faster, damage 5)
+	// Weapon 3: Heavy (fireRate 0.6f = 0.5x slower, damage 20)
+	m_weaponTypes = {
+		{0.3f, 20.f, 10.f, "game/assets/weapons/pistol-idle.png", "game/assets/weapons/pistol-shoot.png"},      // Standard
+		{0.15f, 20.f, 5.f, "game/assets/weapons/machinegun-idle.png", "game/assets/weapons/machinegun-shoot.png"},  // Fast
+		{0.6f, 20.f, 20.f, "game/assets/weapons/sniper-idle.png", "game/assets/weapons/sniper-shoot.png"}       // Heavy
+	};
+	m_currentWeaponIndex = 0;
+
 	// Player wolf
 	auto wolf =
 		systems::createNPC(m_registry, {5.f, 5.f}, targetWolfSize, wolfClips, 5.f);
 	m_registry.emplace<engine::PlayerControlled>(wolf);
 	m_registry.emplace<engine::CastsShadow>(wolf);
+	m_playerEntity = wolf;
 	
 	// Add health to player
 	engine::Health playerHealth;
@@ -82,18 +94,8 @@ void GameLoop::init() {
 	playerHealth.maximum = 100.f;
 	m_registry.emplace<engine::Health>(wolf, playerHealth);
 	
-	// Add weapon to player
-	engine::Weapon weapon;
-	weapon.fireRate = 0.3f;
-	weapon.bulletSpeed = 20.f;
-	m_registry.emplace<engine::Weapon>(wolf, weapon);
-	
-	// Add weapon display to player
-	engine::WeaponDisplay weaponDisplay;
-	weaponDisplay.textureName = "game/assets/weapons/pistol-idle.png";
-	weaponDisplay.offset = {0.3f, -0.1f};
-	weaponDisplay.size = {24.f, 24.f};
-	m_registry.emplace<engine::WeaponDisplay>(wolf, weaponDisplay);
+	// Add initial weapon to player
+	applyWeaponToPlayer(wolf, 0);
 
 	// Enemy wolf 1 (chaser)
 	auto wolf1 =
@@ -198,6 +200,7 @@ void GameLoop::update(engine::Input &input, float dt) {
 	
 	// Input and AI
 	systems::playerInputSystem(m_registry, input);
+	handleWeaponSwitching(input);
 	systems::aiCombatSystem(m_registry, input, dt);
 	
 	// Combat
@@ -397,6 +400,76 @@ void GameLoop::renderGameOverScreen(engine::RenderFrame &frame, engine::Camera &
 	drawPixelChar(letterV, overX + charSpacing, startY, pixelSize, textColor);
 	drawPixelChar(letterE, overX + charSpacing * 2, startY, pixelSize, textColor);
 	drawPixelChar(letterR, overX + charSpacing * 3, startY, pixelSize, textColor);
+}
+
+void GameLoop::handleWeaponSwitching(const engine::Input &input) {
+	if (m_playerEntity == entt::null || !m_registry.valid(m_playerEntity)) {
+		return;
+	}
+
+	// Check for weapon switch keys (1, 2, 3) - only switch once per key press
+	// We need to track previous key state to detect key press events
+	static bool prevKey1 = false, prevKey2 = false, prevKey3 = false;
+	
+	bool key1 = input.isKeyDown(sf::Keyboard::Key::Num1) || input.isKeyDown(sf::Keyboard::Key::Numpad1);
+	bool key2 = input.isKeyDown(sf::Keyboard::Key::Num2) || input.isKeyDown(sf::Keyboard::Key::Numpad2);
+	bool key3 = input.isKeyDown(sf::Keyboard::Key::Num3) || input.isKeyDown(sf::Keyboard::Key::Numpad3);
+	
+	int newWeaponIndex = -1;
+	if (key1 && !prevKey1) {
+		newWeaponIndex = 0;
+	} else if (key2 && !prevKey2) {
+		newWeaponIndex = 1;
+	} else if (key3 && !prevKey3) {
+		newWeaponIndex = 2;
+	}
+	
+	prevKey1 = key1;
+	prevKey2 = key2;
+	prevKey3 = key3;
+
+	if (newWeaponIndex >= 0 && newWeaponIndex < static_cast<int>(m_weaponTypes.size()) && 
+		newWeaponIndex != m_currentWeaponIndex) {
+		applyWeaponToPlayer(m_playerEntity, newWeaponIndex);
+		m_currentWeaponIndex = newWeaponIndex;
+	}
+}
+
+void GameLoop::applyWeaponToPlayer(entt::entity playerEntity, int weaponIndex) {
+	if (weaponIndex < 0 || weaponIndex >= static_cast<int>(m_weaponTypes.size())) {
+		return;
+	}
+
+	const WeaponType &weaponType = m_weaponTypes[weaponIndex];
+
+	// Update or create Weapon component
+	if (m_registry.all_of<engine::Weapon>(playerEntity)) {
+		auto &weapon = m_registry.get<engine::Weapon>(playerEntity);
+		weapon.fireRate = weaponType.fireRate;
+		weapon.bulletSpeed = weaponType.bulletSpeed;
+		weapon.damage = weaponType.damage;
+		// Don't reset timeSinceLastShot to allow smooth switching
+	} else {
+		engine::Weapon weapon;
+		weapon.fireRate = weaponType.fireRate;
+		weapon.bulletSpeed = weaponType.bulletSpeed;
+		weapon.damage = weaponType.damage;
+		m_registry.emplace<engine::Weapon>(playerEntity, weapon);
+	}
+
+	// Update or create WeaponDisplay component
+	if (m_registry.all_of<engine::WeaponDisplay>(playerEntity)) {
+		auto &weaponDisplay = m_registry.get<engine::WeaponDisplay>(playerEntity);
+		weaponDisplay.textureName = weaponType.textureName;
+		weaponDisplay.shootTextureName = weaponType.shootTextureName;
+	} else {
+		engine::WeaponDisplay weaponDisplay;
+		weaponDisplay.textureName = weaponType.textureName;
+		weaponDisplay.shootTextureName = weaponType.shootTextureName;
+		weaponDisplay.offset = {0.3f, -0.1f};
+		weaponDisplay.size = {24.f, 24.f};
+		m_registry.emplace<engine::WeaponDisplay>(playerEntity, weaponDisplay);
+	}
 }
 
 bool GameLoop::isFinished() const { return m_finished; }

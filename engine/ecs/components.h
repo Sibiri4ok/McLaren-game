@@ -97,6 +97,7 @@ struct Weapon {
 	float fireRate = 0.5f;		  // Time between shots in seconds
 	float timeSinceLastShot = 0.f; // Accumulated time since last shot
 	float bulletSpeed = 15.f;	  // Speed of bullets
+	float damage = 10.f;			  // Damage dealt by bullets
 };
 
 /**
@@ -120,6 +121,7 @@ struct IsShooting {
  */
 struct WeaponDisplay {
 	std::string textureName = "game/assets/weapons/pistol-idle.png";
+	std::string shootTextureName = "game/assets/weapons/pistol-shoot.png"; // Texture when shooting
 	sf::Vector2f offset = {0.3f, 0.f}; // Offset from entity position
 	sf::Vector2f size = {32.f, 32.f};
 };

@@ -80,6 +80,21 @@ class GameLoop : public engine::ILoop {
 	engine::Engine *m_engine = nullptr; ///< Pointer to the main engine instance
 	bool m_playerDied = false; ///< Flag tracking if player has died
 	float m_gameOverTimer = 0.f; ///< Timer for game over screen display
+	
+	/**
+	 * @brief Weapon types configuration.
+	 */
+	struct WeaponType {
+		float fireRate;
+		float bulletSpeed;
+		float damage;
+		std::string textureName;
+		std::string shootTextureName;
+	};
+	
+	std::vector<WeaponType> m_weaponTypes; ///< Available weapon types
+	int m_currentWeaponIndex = 0; ///< Current weapon index (0-2)
+	entt::entity m_playerEntity = entt::null; ///< Player entity reference
 
 	/**
 	 * @brief Updates animation states based on entity movement.
@@ -98,6 +113,19 @@ class GameLoop : public engine::ILoop {
 	 * Draws a semi-transparent overlay and "GAME OVER" message when player dies.
 	 */
 	void renderGameOverScreen(engine::RenderFrame &frame, engine::Camera &camera);
+
+	/**
+	 * @brief Handles weapon switching for the player.
+	 * @param input Reference to the input system for reading user commands.
+	 */
+	void handleWeaponSwitching(const engine::Input &input);
+
+	/**
+	 * @brief Applies weapon configuration to player entity.
+	 * @param playerEntity Player entity to apply weapon to.
+	 * @param weaponIndex Index of weapon type to apply (0-2).
+	 */
+	void applyWeaponToPlayer(entt::entity playerEntity, int weaponIndex);
 
 	int width;	///< World width in tile units
 	int height; ///< World height in tile units

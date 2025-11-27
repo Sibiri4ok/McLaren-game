@@ -419,9 +419,9 @@ void weaponSystem(entt::registry &registry, const Input &input, float dt) {
 			proj.direction = shootDir;
 			registry.emplace<Projectile>(bullet, std::move(proj));
 			
-			// Add damage component
+			// Add damage component (use damage from weapon)
 			Damage dmg;
-			dmg.amount = 10.f;
+			dmg.amount = weapon.damage;
 			dmg.owner = entity;
 			dmg.hasOwner = true;
 			registry.emplace<Damage>(bullet, std::move(dmg));
@@ -530,7 +530,7 @@ void weaponDisplaySystem(entt::registry &registry, RenderFrame &frame,
 		// Determine weapon texture based on shooting state
 		std::string weaponTexture = weaponDisp.textureName;
 		if (registry.all_of<IsShooting>(entity)) {
-			weaponTexture = "game/assets/weapons/pistol-shoot.png";
+			weaponTexture = weaponDisp.shootTextureName;
 		}
 
 		const sf::Image *weaponImage = &imageManager.getImage(weaponTexture);
