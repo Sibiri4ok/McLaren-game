@@ -198,6 +198,28 @@ void GameLoop::update(engine::Input &input, float dt) {
 		}
 	}
 	
+	// Check if player has won (all enemies are dead)
+	if (!m_playerWon && checkPlayerWin()) {
+		m_playerWon = true;
+		m_winTimer = 0.f;
+	}
+	
+	// Handle win screen
+	if (m_playerWon) {
+		m_winTimer += dt;
+		
+		// Return to menu after 4 seconds of win screen
+		if (m_winTimer >= 4.0f) {
+			// Switch back to menu loop so player can restart
+			auto menuLoop = std::make_unique<MenuLoop>();
+			m_engine->setLoop(std::move(menuLoop));
+			m_finished = true;
+		}
+		
+		// Don't process game logic if player has won
+		return;
+	}
+	
 	// Input and AI
 	systems::playerInputSystem(m_registry, input);
 	handleWeaponSwitching(input);
@@ -249,8 +271,12 @@ void GameLoop::collectRenderData(engine::RenderFrame &frame,
 	// Render damage numbers (floating above entities)
 	systems::damageNumberRenderSystem(m_registry, frame, camera);
 	
+	// Render win screen if player won
+	if (m_playerWon) {
+		renderWinScreen(frame, camera);
+	}
 	// Render game over screen if player died
-	if (m_playerDied) {
+	else if (m_playerDied) {
 		renderGameOverScreen(frame, camera);
 	}
 }
@@ -404,6 +430,176 @@ void GameLoop::renderGameOverScreen(engine::RenderFrame &frame, engine::Camera &
 	drawPixelChar(letterV, overX + charSpacing, startY, pixelSize, textColor);
 	drawPixelChar(letterE, overX + charSpacing * 2, startY, pixelSize, textColor);
 	drawPixelChar(letterR, overX + charSpacing * 3, startY, pixelSize, textColor);
+}
+
+bool GameLoop::checkPlayerWin() const {
+	// Check if player is alive
+	bool playerAlive = false;
+	auto playerView = m_registry.view<const engine::PlayerControlled, const engine::Health>();
+	for (auto entity : playerView) {
+		const auto &health = playerView.get<const engine::Health>(entity);
+		if (!health.isDead && !m_registry.all_of<engine::Dead>(entity)) {
+			playerAlive = true;
+			break;
+		}
+	}
+	
+	if (!playerAlive) {
+		return false; // Player is dead, can't win
+	}
+	
+	// Check if there are any alive enemies (entities with Health but without PlayerControlled)
+	auto allEntities = m_registry.view<const engine::Health>();
+	for (auto entity : allEntities) {
+		// Skip player
+		if (m_registry.all_of<engine::PlayerControlled>(entity)) {
+			continue;
+		}
+		
+		// Check if this enemy is alive
+		const auto &health = allEntities.get<const engine::Health>(entity);
+		if (!health.isDead && !m_registry.all_of<engine::Dead>(entity)) {
+			return false; // Found alive enemy
+		}
+	}
+	
+	// All enemies are dead, player wins!
+	return true;
+}
+
+void GameLoop::renderWinScreen(engine::RenderFrame &frame, engine::Camera &camera) {
+	// Initialize vertex arrays for UI
+	frame.uiOverlayVertices.setPrimitiveType(sf::PrimitiveType::Triangles);
+	frame.uiOverlayVertices.clear();
+	frame.uiTextVertices.setPrimitiveType(sf::PrimitiveType::Triangles);
+	frame.uiTextVertices.clear();
+	
+	// Create semi-transparent dark overlay
+	sf::Color overlayColor(0, 0, 0, 180); // Dark overlay with alpha
+	sf::Vector2f topLeft(camera.position.x - camera.size.x / 2.f, 
+						 camera.position.y - camera.size.y / 2.f);
+	sf::Vector2f bottomRight(camera.position.x + camera.size.x / 2.f, 
+							 camera.position.y + camera.size.y / 2.f);
+	
+	// Two triangles to form a rectangle overlay
+	frame.uiOverlayVertices.append({topLeft, overlayColor});
+	frame.uiOverlayVertices.append({{bottomRight.x, topLeft.y}, overlayColor});
+	frame.uiOverlayVertices.append({bottomRight, overlayColor});
+	
+	frame.uiOverlayVertices.append({topLeft, overlayColor});
+	frame.uiOverlayVertices.append({bottomRight, overlayColor});
+	frame.uiOverlayVertices.append({{topLeft.x, bottomRight.y}, overlayColor});
+	
+	// Helper function to draw a pixel character
+	auto drawPixelChar = [&](int charData[7], float x, float y, float pixelSize, sf::Color color) {
+		for (int row = 0; row < 7; ++row) {
+			for (int col = 0; col < 5; ++col) {
+				if (charData[row] & (1 << (4 - col))) {
+					float px = x + col * pixelSize;
+					float py = y + row * pixelSize;
+					
+					// Create two triangles for each pixel (quad)
+					frame.uiTextVertices.append({{px, py}, color});
+					frame.uiTextVertices.append({{px + pixelSize, py}, color});
+					frame.uiTextVertices.append({{px + pixelSize, py + pixelSize}, color});
+					
+					frame.uiTextVertices.append({{px, py}, color});
+					frame.uiTextVertices.append({{px + pixelSize, py + pixelSize}, color});
+					frame.uiTextVertices.append({{px, py + pixelSize}, color});
+				}
+			}
+		}
+	};
+	
+	// Simple 5x7 bitmap font data
+	// Y
+	int letterY[7] = {
+		0b10001,
+		0b10001,
+		0b10001,
+		0b01010,
+		0b00100,
+		0b00100,
+		0b00100
+	};
+	
+	// O
+	int letterO[7] = {
+		0b01110,
+		0b10001,
+		0b10001,
+		0b10001,
+		0b10001,
+		0b10001,
+		0b01110
+	};
+	
+	// U
+	int letterU[7] = {
+		0b10001,
+		0b10001,
+		0b10001,
+		0b10001,
+		0b10001,
+		0b10001,
+		0b01110
+	};
+	
+	// W
+	int letterW[7] = {
+		0b10001,
+		0b10001,
+		0b10001,
+		0b10101,
+		0b10101,
+		0b11011,
+		0b10001
+	};
+	
+	// I
+	int letterI[7] = {
+		0b11111,
+		0b00100,
+		0b00100,
+		0b00100,
+		0b00100,
+		0b00100,
+		0b11111
+	};
+	
+	// N
+	int letterN[7] = {
+		0b10001,
+		0b10001,
+		0b11001,
+		0b10101,
+		0b10011,
+		0b10001,
+		0b10001
+	};
+	
+	// Calculate center position for text
+	float pixelSize = 4.0f;
+	float charSpacing = 6.0f * pixelSize;
+	float wordSpacing = 10.0f * pixelSize;
+	
+	// "YOU" = 3 letters, "WIN" = 3 letters, 1 space between words
+	float totalWidth = 3 * charSpacing + wordSpacing + 3 * charSpacing;
+	float startX = camera.position.x - totalWidth / 2.f;
+	float startY = camera.position.y - 20.0f;
+	
+	sf::Color textColor(50, 255, 50); // Green color for "YOU WIN"
+	
+	// Draw "YOU"
+	drawPixelChar(letterY, startX, startY, pixelSize, textColor);
+	drawPixelChar(letterO, startX + charSpacing, startY, pixelSize, textColor);
+	drawPixelChar(letterU, startX + charSpacing * 2, startY, pixelSize, textColor);
+	
+	// Draw "WIN"
+	float winX = startX + charSpacing * 3 + wordSpacing;
+	drawPixelChar(letterW, winX, startY, pixelSize, textColor);
+	drawPixelChar(letterI, winX + charSpacing, startY, pixelSize, textColor);
+	drawPixelChar(letterN, winX + charSpacing * 2, startY, pixelSize, textColor);
 }
 
 void GameLoop::handleWeaponSwitching(const engine::Input &input) {

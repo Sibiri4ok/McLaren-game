@@ -80,6 +80,8 @@ class GameLoop : public engine::ILoop {
 	engine::Engine *m_engine = nullptr; ///< Pointer to the main engine instance
 	bool m_playerDied = false; ///< Flag tracking if player has died
 	float m_gameOverTimer = 0.f; ///< Timer for game over screen display
+	bool m_playerWon = false; ///< Flag tracking if player has won
+	float m_winTimer = 0.f; ///< Timer for win screen display
 	
 	/**
 	 * @brief Weapon types configuration.
@@ -113,6 +115,21 @@ class GameLoop : public engine::ILoop {
 	 * Draws a semi-transparent overlay and "GAME OVER" message when player dies.
 	 */
 	void renderGameOverScreen(engine::RenderFrame &frame, engine::Camera &camera);
+
+	/**
+	 * @brief Renders the win UI overlay and message.
+	 * @param frame Reference to the render frame for collecting draw commands.
+	 * @param camera Reference to the camera for positioning.
+	 *
+	 * Draws a semi-transparent overlay and "YOU WIN" message when player wins.
+	 */
+	void renderWinScreen(engine::RenderFrame &frame, engine::Camera &camera);
+
+	/**
+	 * @brief Checks if all enemies are dead and player has won.
+	 * @return True if player has won (all enemies dead), false otherwise.
+	 */
+	bool checkPlayerWin() const;
 
 	/**
 	 * @brief Handles weapon switching for the player.
