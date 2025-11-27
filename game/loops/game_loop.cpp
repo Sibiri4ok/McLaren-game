@@ -8,7 +8,9 @@
 #include "ecs/systems.h"
 #include "ecs/utils.h"
 #include "ecs/world_loader.h"
+#include "loops/menu_loop.h"
 #include "resources/image_manager.h"
+#include <memory>
 #include <random>
 
 GameLoop::GameLoop() {
@@ -181,8 +183,11 @@ void GameLoop::update(engine::Input &input, float dt) {
 			m_playerDied = true;
 			m_gameOverTimer += dt;
 			
-			// Stop the game after 3 seconds of game over screen
-			if (m_gameOverTimer >= 3.0f) {
+			// Return to menu after 4 seconds of game over screen
+			if (m_gameOverTimer >= 4.0f) {
+				// Switch back to menu loop so player can restart
+				auto menuLoop = std::make_unique<MenuLoop>();
+				m_engine->setLoop(std::move(menuLoop));
 				m_finished = true;
 			}
 			
