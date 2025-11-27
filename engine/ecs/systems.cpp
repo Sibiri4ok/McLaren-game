@@ -592,12 +592,22 @@ void damageSystem(entt::registry &registry) {
 			float distance = std::sqrt(diff.x * diff.x + diff.y * diff.y);
 			
 			if (distance < 0.6f) { // Hit radius
-				health.current -= damage.amount;
+				float damageDealt = damage.amount;
+				health.current -= damageDealt;
 				
 				if (health.current <= 0.f) {
 					health.current = 0.f;
 					health.isDead = true;
 					registry.emplace<Dead>(entity);
+				}
+				
+				// Create damage number if bullet was fired by player
+				if (damage.hasOwner && registry.all_of<PlayerControlled>(damage.owner)) {
+					auto damageNumber = registry.create();
+					DamageNumber dmgNum;
+					dmgNum.amount = damageDealt;
+					dmgNum.position = entityPos.value;
+					registry.emplace<DamageNumber>(damageNumber, dmgNum);
 				}
 				
 				hitSomething = true;
@@ -796,6 +806,104 @@ void deathSystem(entt::registry &registry) {
 		} else {
 			// Remove after fully faded
 			registry.destroy(entity);
+		}
+	}
+}
+
+void damageNumberSystem(entt::registry &registry, float dt) {
+	auto view = registry.view<DamageNumber>();
+	std::vector<entt::entity> toDestroy;
+	
+	for (auto entity : view) {
+		auto &dmgNum = view.get<DamageNumber>(entity);
+		dmgNum.timeAlive += dt;
+		
+		// Remove after lifetime expires
+		if (dmgNum.timeAlive >= dmgNum.lifetime) {
+			toDestroy.push_back(entity);
+		}
+	}
+	
+	for (auto entity : toDestroy) {
+		registry.destroy(entity);
+	}
+}
+
+void damageNumberRenderSystem(entt::registry &registry, RenderFrame &frame,
+							 const Camera &camera) {
+	// Initialize vertex array for damage numbers
+	frame.uiTextVertices.setPrimitiveType(sf::PrimitiveType::Triangles);
+	
+	auto view = registry.view<const DamageNumber>();
+	
+	// Helper function to render a single digit
+	auto renderDigit = [&](int digit, float x, float y, float pixelSize, sf::Color color) {
+		// Simple 5x7 bitmap font for digits 0-9
+		int digitData[10][7] = {
+			{0b01110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110}, // 0
+			{0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110}, // 1
+			{0b01110, 0b10001, 0b00001, 0b01110, 0b10000, 0b10000, 0b11111}, // 2
+			{0b01110, 0b10001, 0b00001, 0b01110, 0b00001, 0b10001, 0b01110}, // 3
+			{0b10001, 0b10001, 0b10001, 0b11111, 0b00001, 0b00001, 0b00001}, // 4
+			{0b11111, 0b10000, 0b10000, 0b11110, 0b00001, 0b00001, 0b11110}, // 5
+			{0b01110, 0b10001, 0b10000, 0b11110, 0b10001, 0b10001, 0b01110}, // 6
+			{0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000}, // 7
+			{0b01110, 0b10001, 0b10001, 0b01110, 0b10001, 0b10001, 0b01110}, // 8
+			{0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b10001, 0b01110}  // 9
+		};
+		
+		if (digit < 0 || digit > 9) return;
+		
+		const int *charData = digitData[digit];
+		for (int row = 0; row < 7; ++row) {
+			for (int col = 0; col < 5; ++col) {
+				if (charData[row] & (1 << (4 - col))) {
+					float px = x + col * pixelSize;
+					float py = y + row * pixelSize;
+					
+					// Create two triangles for each pixel
+					frame.uiTextVertices.append({{px, py}, color});
+					frame.uiTextVertices.append({{px + pixelSize, py}, color});
+					frame.uiTextVertices.append({{px + pixelSize, py + pixelSize}, color});
+					
+					frame.uiTextVertices.append({{px, py}, color});
+					frame.uiTextVertices.append({{px + pixelSize, py + pixelSize}, color});
+					frame.uiTextVertices.append({{px, py + pixelSize}, color});
+				}
+			}
+		}
+	};
+	
+	for (auto entity : view) {
+		const auto &dmgNum = view.get<const DamageNumber>(entity);
+		
+		// Calculate screen position (float upward over time)
+		float floatOffset = dmgNum.timeAlive * 2.0f; // Float upward
+		sf::Vector2f worldPos = {
+			dmgNum.position.x,
+			dmgNum.position.y - floatOffset - 0.5f // Above entity
+		};
+		sf::Vector2f screenPos = camera.worldToScreen(worldPos);
+		
+		// Calculate alpha (fade out over time)
+		float alpha = 1.0f - (dmgNum.timeAlive / dmgNum.lifetime);
+		alpha = std::max(0.0f, std::min(1.0f, alpha));
+		sf::Color textColor(255, 100, 100, static_cast<unsigned char>(255 * alpha)); // Red color
+		
+		// Convert damage amount to string and render
+		int damageInt = static_cast<int>(dmgNum.amount);
+		std::string damageStr = std::to_string(damageInt);
+		
+		float pixelSize = 2.5f;
+		float charSpacing = 5.0f * pixelSize;
+		float totalWidth = damageStr.length() * charSpacing;
+		float startX = screenPos.x - totalWidth / 2.0f;
+		float startY = screenPos.y;
+		
+		// Render each digit
+		for (size_t i = 0; i < damageStr.length(); ++i) {
+			int digit = damageStr[i] - '0';
+			renderDigit(digit, startX + i * charSpacing, startY, pixelSize, textColor);
 		}
 	}
 }

@@ -150,6 +150,16 @@ struct Damage {
 struct Dead {};
 
 /**
+ * @brief Component for displaying floating damage numbers.
+ */
+struct DamageNumber {
+	float amount; ///< Damage amount to display
+	float lifetime = 1.5f; ///< Time before disappearing
+	float timeAlive = 0.f; ///< Time since creation
+	sf::Vector2f position; ///< World position where damage occurred
+};
+
+/**
  * @brief Component for AI combat behavior.
  */
 struct AICombat {

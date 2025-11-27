@@ -207,6 +207,7 @@ void GameLoop::update(engine::Input &input, float dt) {
 	systems::weaponSystem(m_registry, input, dt);
 	systems::projectileSystem(m_registry, tiles, width, height, dt);
 	systems::damageSystem(m_registry);
+	systems::damageNumberSystem(m_registry, dt);
 	systems::deathSystem(m_registry);
 	
 	// Movement
@@ -244,6 +245,9 @@ void GameLoop::collectRenderData(engine::RenderFrame &frame,
 	
 	// Render health bars on top of everything
 	systems::healthBarSystem(m_registry, frame, camera);
+	
+	// Render damage numbers (floating above entities)
+	systems::damageNumberRenderSystem(m_registry, frame, camera);
 	
 	// Render game over screen if player died
 	if (m_playerDied) {

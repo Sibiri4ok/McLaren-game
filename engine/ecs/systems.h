@@ -149,4 +149,20 @@ void aiCombatSystem(entt::registry &registry, const engine::Input &input, float 
  */
 void deathSystem(entt::registry &registry);
 
+/**
+ * @brief Updates and removes expired damage numbers.
+ * @param registry Reference to the ECS registry.
+ * @param dt Delta time in seconds.
+ */
+void damageNumberSystem(entt::registry &registry, float dt);
+
+/**
+ * @brief Renders floating damage numbers above entities.
+ * @param registry Reference to the ECS registry.
+ * @param frame Reference to the render frame for collecting draw commands.
+ * @param camera Reference to the camera for positioning.
+ */
+void damageNumberRenderSystem(entt::registry &registry, engine::RenderFrame &frame,
+							 const engine::Camera &camera);
+
 } // namespace systems
