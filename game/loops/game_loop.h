@@ -78,6 +78,8 @@ class GameLoop : public engine::ILoop {
 	entt::registry m_registry;
 
 	engine::Engine *m_engine = nullptr; ///< Pointer to the main engine instance
+	bool m_playerDied = false; ///< Flag tracking if player has died
+	float m_gameOverTimer = 0.f; ///< Timer for game over screen display
 
 	/**
 	 * @brief Updates animation states based on entity movement.
@@ -87,6 +89,15 @@ class GameLoop : public engine::ILoop {
 	 * Manages animation state changes and frame resetting.
 	 */
 	void gameAnimationSystem(float dt);
+
+	/**
+	 * @brief Renders the game over UI overlay and message.
+	 * @param frame Reference to the render frame for collecting draw commands.
+	 * @param camera Reference to the camera for positioning.
+	 *
+	 * Draws a semi-transparent overlay and "GAME OVER" message when player dies.
+	 */
+	void renderGameOverScreen(engine::RenderFrame &frame, engine::Camera &camera);
 
 	int width;	///< World width in tile units
 	int height; ///< World height in tile units

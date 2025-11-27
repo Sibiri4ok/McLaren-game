@@ -173,6 +173,24 @@ void GameLoop::gameAnimationSystem(float dt) {
 }
 
 void GameLoop::update(engine::Input &input, float dt) {
+	// Check if player has died
+	auto playerView = m_registry.view<const engine::PlayerControlled, const engine::Health>();
+	for (auto entity : playerView) {
+		const auto &health = playerView.get<const engine::Health>(entity);
+		if (health.isDead || m_registry.all_of<engine::Dead>(entity)) {
+			m_playerDied = true;
+			m_gameOverTimer += dt;
+			
+			// Stop the game after 3 seconds of game over screen
+			if (m_gameOverTimer >= 3.0f) {
+				m_finished = true;
+			}
+			
+			// Don't process game logic if player is dead
+			return;
+		}
+	}
+	
 	// Input and AI
 	systems::playerInputSystem(m_registry, input);
 	systems::aiCombatSystem(m_registry, input, dt);
@@ -193,10 +211,10 @@ void GameLoop::update(engine::Input &input, float dt) {
 	gameAnimationSystem(dt);
 
 	// Camera follow
-	auto playerView =
+	auto playerPosView =
 		m_registry.view<const engine::Position, const engine::PlayerControlled>();
-	for (auto entity : playerView) {
-		const auto &pos = playerView.get<const engine::Position>(entity);
+	for (auto entity : playerPosView) {
+		const auto &pos = playerPosView.get<const engine::Position>(entity);
 		m_engine->camera.position = m_engine->camera.worldToScreen(pos.value);
 	}
 }
@@ -218,6 +236,162 @@ void GameLoop::collectRenderData(engine::RenderFrame &frame,
 	
 	// Render health bars on top of everything
 	systems::healthBarSystem(m_registry, frame, camera);
+	
+	// Render game over screen if player died
+	if (m_playerDied) {
+		renderGameOverScreen(frame, camera);
+	}
+}
+
+void GameLoop::renderGameOverScreen(engine::RenderFrame &frame, engine::Camera &camera) {
+	// Initialize vertex arrays for UI
+	frame.uiOverlayVertices.setPrimitiveType(sf::PrimitiveType::Triangles);
+	frame.uiOverlayVertices.clear();
+	frame.uiTextVertices.setPrimitiveType(sf::PrimitiveType::Triangles);
+	frame.uiTextVertices.clear();
+	
+	// Create semi-transparent dark overlay
+	sf::Color overlayColor(0, 0, 0, 180); // Dark overlay with alpha
+	sf::Vector2f topLeft(camera.position.x - camera.size.x / 2.f, 
+						 camera.position.y - camera.size.y / 2.f);
+	sf::Vector2f bottomRight(camera.position.x + camera.size.x / 2.f, 
+							 camera.position.y + camera.size.y / 2.f);
+	
+	// Two triangles to form a rectangle overlay
+	frame.uiOverlayVertices.append({topLeft, overlayColor});
+	frame.uiOverlayVertices.append({{bottomRight.x, topLeft.y}, overlayColor});
+	frame.uiOverlayVertices.append({bottomRight, overlayColor});
+	
+	frame.uiOverlayVertices.append({topLeft, overlayColor});
+	frame.uiOverlayVertices.append({bottomRight, overlayColor});
+	frame.uiOverlayVertices.append({{topLeft.x, bottomRight.y}, overlayColor});
+	
+	// Simple bitmap font for "GAME OVER" text
+	// Each letter is defined as a 5x7 grid of pixels
+	auto drawPixelChar = [&](int charData[7], float x, float y, float pixelSize, sf::Color color) {
+		for (int row = 0; row < 7; ++row) {
+			for (int col = 0; col < 5; ++col) {
+				if (charData[row] & (1 << (4 - col))) {
+					float px = x + col * pixelSize;
+					float py = y + row * pixelSize;
+					
+					// Create two triangles for each pixel (quad)
+					// Triangle 1
+					frame.uiTextVertices.append({{px, py}, color});
+					frame.uiTextVertices.append({{px + pixelSize, py}, color});
+					frame.uiTextVertices.append({{px + pixelSize, py + pixelSize}, color});
+					
+					// Triangle 2
+					frame.uiTextVertices.append({{px, py}, color});
+					frame.uiTextVertices.append({{px + pixelSize, py + pixelSize}, color});
+					frame.uiTextVertices.append({{px, py + pixelSize}, color});
+				}
+			}
+		}
+	};
+	
+	// Simple 5x7 bitmap font data
+	// G
+	int letterG[7] = {
+		0b01110,
+		0b10001,
+		0b10000,
+		0b10011,
+		0b10001,
+		0b10001,
+		0b01110
+	};
+	
+	// A
+	int letterA[7] = {
+		0b01110,
+		0b10001,
+		0b10001,
+		0b11111,
+		0b10001,
+		0b10001,
+		0b10001
+	};
+	
+	// M
+	int letterM[7] = {
+		0b10001,
+		0b11011,
+		0b10101,
+		0b10101,
+		0b10001,
+		0b10001,
+		0b10001
+	};
+	
+	// E
+	int letterE[7] = {
+		0b11111,
+		0b10000,
+		0b10000,
+		0b11110,
+		0b10000,
+		0b10000,
+		0b11111
+	};
+	
+	// O
+	int letterO[7] = {
+		0b01110,
+		0b10001,
+		0b10001,
+		0b10001,
+		0b10001,
+		0b10001,
+		0b01110
+	};
+	
+	// V
+	int letterV[7] = {
+		0b10001,
+		0b10001,
+		0b10001,
+		0b10001,
+		0b10001,
+		0b01010,
+		0b00100
+	};
+	
+	// R
+	int letterR[7] = {
+		0b11110,
+		0b10001,
+		0b10001,
+		0b11110,
+		0b10100,
+		0b10010,
+		0b10001
+	};
+	
+	// Calculate center position for text
+	float pixelSize = 4.0f;
+	float charSpacing = 6.0f * pixelSize;
+	float wordSpacing = 10.0f * pixelSize;
+	
+	// "GAME" = 4 letters, "OVER" = 4 letters, 1 space between words
+	float totalWidth = 4 * charSpacing + wordSpacing + 4 * charSpacing;
+	float startX = camera.position.x - totalWidth / 2.f;
+	float startY = camera.position.y - 20.0f;
+	
+	sf::Color textColor(255, 50, 50); // Red color for "GAME OVER"
+	
+	// Draw "GAME"
+	drawPixelChar(letterG, startX, startY, pixelSize, textColor);
+	drawPixelChar(letterA, startX + charSpacing, startY, pixelSize, textColor);
+	drawPixelChar(letterM, startX + charSpacing * 2, startY, pixelSize, textColor);
+	drawPixelChar(letterE, startX + charSpacing * 3, startY, pixelSize, textColor);
+	
+	// Draw "OVER"
+	float overX = startX + charSpacing * 4 + wordSpacing;
+	drawPixelChar(letterO, overX, startY, pixelSize, textColor);
+	drawPixelChar(letterV, overX + charSpacing, startY, pixelSize, textColor);
+	drawPixelChar(letterE, overX + charSpacing * 2, startY, pixelSize, textColor);
+	drawPixelChar(letterR, overX + charSpacing * 3, startY, pixelSize, textColor);
 }
 
 bool GameLoop::isFinished() const { return m_finished; }
