@@ -24,32 +24,6 @@ McLaren is a C++ game engine specializing in isometric rendering. Built on top o
 
 ![demo](/demo.gif)
 
-### 🎮 New: Full Combat System
-
-The demo now features a **complete combat system**! Play as a wolf in an isometric arena battle:
-
-**🔫 Weapon System:**
-- Animated shooting with muzzle flash effects
-- Direction-based aiming (shoots where you're facing)
-- Physics-based projectiles with collision detection
-- Visual weapon display that dynamically changes
-
-**⚔️ Combat System:**
-- 💚 Health system (100 HP per character)
-- 💥 Damage system (10 HP per hit)
-- 🤖 AI enemies that shoot back automatically
-- 📊 Visual health bars above all characters
-- ⚰️ Death system with fade-out effects
-
-**Controls:**
-- `W/A/S/D` - Move character
-- `SPACE` - Shoot pistol
-
-**Documentation:**
-- [WEAPON_SYSTEM.md](WEAPON_SYSTEM.md) - Weapon system details
-- [COMBAT_SYSTEM.md](COMBAT_SYSTEM.md) - Combat system details
-- [QUICK_GUIDE_RU.md](QUICK_GUIDE_RU.md) - Quick start guide
-
 ## API Overview
 
 McLaren provides a clean, intuitive API for game development:
